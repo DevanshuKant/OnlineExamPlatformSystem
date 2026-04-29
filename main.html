@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Check</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem; 
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        .animate-zoom-in {
+            animation: zoomIn 0.3s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes zoomIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 🔥 AGGRESSIVE SCROLL FIX: Maximize viewport space for question area and hide scrollbar 🔥 */
+        #examContentScroll {
+            height: calc(100vh - 180px); /* Reduced height requirement */
+            overflow-y: hidden; /* Hide vertical scrollbar */
+            padding-right: 0.5rem;
+            padding-top: 0.5rem;
+        }
+
+        /* Fixed Top Left Webcam Display Panel */
+        #webcamStatusPanel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            padding: 5px;
+            border: 1px solid #3b82f6;
+        }
+        #webcamStatusPanel .video-container {
+            width: 80px; 
+            height: 60px; 
+            overflow: hidden;
+            border-radius: 4px;
+            border: 2px solid #3b82f6;
+        }
+        #webcamStatusPanel video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Minimized Options and Question Text */
+        #optionsContainer button {
+            padding: 0.6rem; 
+            font-size: 0.9rem; 
+        }
+        #questionText {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem !important; /* Extra reduction */
+        }
+        /* Increased size of the main media toggle button on the idle screen */
+        #toggleWebcamMicButton {
+            padding-top: 0.8rem !important;
+            padding-bottom: 0.8rem !important;
+            padding-left: 2.5rem !important;
+            padding-right: 2.5rem !important;
+            font-size: 1.125rem !important; 
+            border-radius: 9999px !important; 
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 flex items-center justify-center p-4 font-sans text-gray-900">
+
+    <div id="webcamStatusPanel" class="hidden flex-col items-center gap-1">
+        <p class="text-xs font-bold text-blue-700">Live Video</p>
+        <div class="flex flex-col items-center gap-1">
+            <div class="video-container">
+                 <video id="webcamVideo" autoplay playsinline muted class="hidden"></video>
+            </div>
+        </div>
+        <p id="micStatusExam" class="text-xs font-semibold text-gray-600 hidden">Mic: <span class="font-bold text-green-600">Active</span></p>
+    </div>
+    
+    <div class="w-full max-w-5xl bg-white rounded-xl shadow-2xl p-6 border-t-4 border-blue-500 flex flex-col lg:flex-row gap-4 relative">
+        
+        <div class="flex-1 text-sm">
+            <h1 class="text-2xl font-extrabold text-center text-gray-900 mb-4">
+                Skill Check
+            </h1>
+
+            <div id="loadingScreen" class="hidden flex justify-center items-center h-48">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+                <p class="ml-4 text-lg text-blue-700">Loading...</p>
+            </div>
+
+            <div id="idleScreen" class="text-center p-5 bg-blue-50 rounded-lg shadow-inner">
+                <p class="text-lg text-gray-700 mb-3">
+                    Welcome to your **Skill Check**!
+                </p>
+                <p class="text-sm text-gray-600 mb-2">
+                    This exam consists of <span id="totalQuestionsCount"></span> multiple-choice questions (Java and Aptitude).
+                </p>
+                <p class="text-sm text-gray-600 font-bold text-red-700 mb-3">
+                    Please enable your webcam and microphone to proceed.
+                </p>
+                <p class="text-sm text-gray-600 mb-4">
+                    You will have <span id="initialTime"></span> to complete the exam.
+                </p>
+
+                <div class="mt-4 flex flex-col items-center justify-center gap-3">
+                    <button id="toggleWebcamMicButton" class="px-6 py-3 bg-green-500 text-white font-bold text-lg rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-75">
+                        Enable Webcam & Mic
+                    </button>
+                    <p id="toggleStatusMessage" class="text-sm font-semibold text-gray-600 hidden"></p>
+                </div>
+                <button id="startButton" disabled class="mt-4 px-6 py-3 bg-blue-600 text-white font-bold text-lg rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-75 opacity-50 cursor-not-allowed">
+                    Start Exam
+                </button>
+            </div>
+
+            <div id="examScreen" class="hidden">
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+                    <div id="progressBar" class="bg-blue-500 h-full rounded-full transition-all duration-500 ease-out" style="width: 0%;"></div>
+                </div>
+                
+                <div id="proctoringWarning" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-2 mb-3 rounded-lg shadow-md">
+                    <p class="font-bold text-xs" id="warningTitle"></p>
+                    <p class="text-xs" id="warningMessage"></p>
+                    <p class="mt-1 text-xs font-semibold">Attempts Remaining: <span id="attemptsRemaining">3</span></p>
+                </div>
+
+                <div class="flex justify-between items-center mb-3 p-2 bg-blue-50 rounded-lg shadow-inner border border-blue-200">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-blue-800">
+                            Time Left: <span id="timeLeftDisplay" class="font-bold text-blue-900"></span>
+                        </span>
+                        <div class="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div id="progressBar" class="bg-blue-500 h-full rounded-full transition-all duration-500 ease-out" style="width: 0%;"></div>
+                        </div>
+                        <span class="text-xs font-medium text-blue-800 hidden sm:inline">
+                            Progress: <span id="answeredQuestionsCount" class="font-bold text-blue-900"></span> / <span id="totalQuestionsDisplay"></span>
+                        </span>
+                    </div>
+
+                    <button id="submitExamButtonTop" class="px-3 py-1 bg-red-500 text-white font-semibold text-xs rounded-full shadow-md hover:bg-red-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
+                        Submit Exam
+                    </button>
+                </div>
+                
+                <div id="examContentScroll"> 
+                    <div id="questionContainer" class="bg-white p-4 rounded-lg shadow-lg mb-3 border border-gray-100">
+                        <div class="flex justify-between items-center mb-2">
+                            <h2 id="questionNumber" class="text-sm font-semibold text-gray-800"></h2>
+                            <button id="markReviewButton" class="px-2 py-1 rounded-full text-xs font-medium transition-colors duration-200 shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                Mark for Review
+                            </button>
+                        </div>
+                        <p id="questionText" class="text-gray-700 leading-relaxed"></p>
+                        <div id="optionsContainer" class="space-y-2">
+                            </div>
+                    </div>
+
+                    <div class="flex justify-between mt-3 pb-2">
+                        <button id="prevButton" disabled class="px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 shadow-md bg-gray-300 text-gray-600 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                            Previous
+                        </button>
+                        <button id="nextButton" class="px-4 py-2 bg-blue-500 text-white rounded-full text-sm font-semibold shadow-md hover:bg-blue-600 hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="resultsScreen" class="hidden bg-white p-6 rounded-lg shadow-xl text-center">
+                <h2 class="text-xl font-bold text-blue-700 mb-4" id="resultsTitle">Exam Completed!</h2>
+                <div id="examCancelledDetails" class="hidden">
+                    <p class="text-lg text-red-700 font-extrabold mb-3">
+                        EXAM CANCELLED
+                    </p>
+                    <p class="text-sm text-red-600 mb-5">
+                        The exam was automatically invalidated due to exceeding the maximum limit of **3 proctoring violations**.
+                    </p>
+                </div>
+
+                <div id="examNormalDetails">
+                    <p class="text-lg text-gray-800 mb-3">
+                        Your Score: <span id="finalScore" class="font-extrabold text-blue-900"></span> out of <span id="totalQuestionsResults" class="font-extrabold text-blue-900"></span>
+                    </p>
+                    <p class="text-sm text-gray-600 mb-5">
+                        You answered <span id="correctAnswersCount"></span> questions correctly.
+                    </p>
+                </div>
+                
+                <button id="startNewExamButton" class="px-5 py-2.5 bg-green-600 text-white font-bold text-base rounded-full shadow-lg hover:bg-green-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-75">
+                    Start New Exam
+                </button>
+
+                <div class="mt-5 text-left" id="reviewSection">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3">Review Your Answers:</h3>
+                    <div id="reviewAnswersContainer">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="navigationPanel" class="w-full lg:w-56 bg-gray-50 p-4 rounded-lg shadow-lg flex-shrink-0 border border-gray-100 hidden">
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Questions Navigation</h3>
+            <div id="questionNavGrid" class="grid grid-cols-5 gap-2">
+            </div>
+            <div class="mt-4 text-xs text-gray-600 space-y-1">
+                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-600 mr-2"></span> Current Question</div>
+                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-200 mr-2"></span> Answered</div>
+                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-200 mr-2"></span> Marked for Review</div>
+                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-gray-100 mr-2"></span> Unanswered</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmationModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4 hidden animate-fade-in">
+        <div id="modalContent" class="bg-white p-6 rounded-lg shadow-2xl text-center max-w-xs w-full transform scale-100 animate-zoom-in">
+            <h3 id="modalTitle" class="text-xl font-bold text-gray-900 mb-3"></h3>
+            <p id="modalMessage" class="text-base text-gray-700 mb-4"></p>
+            <div id="modalButtons" class="flex justify-center space-x-3">
+                <button id="modalCancelButton" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-full font-semibold text-sm hover:bg-gray-400 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">
+                    Go Back
+                </button>
+                <button id="modalConfirmButton" class="px-4 py-2 bg-blue-600 text-white rounded-full font-semibold text-sm hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    Submit Exam
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            // --- Java Questions (10) ---
+            { id: 1, questionText: 'Which of the following is NOT a Java keyword?', options: ['static', 'Boolean', 'void', 'private'], correctAnswer: 'Boolean' },
+            { id: 2, questionText: 'What is the entry point of a Java application?', options: ['main() method', 'start() method', 'init() method', 'run() method'], correctAnswer: 'main() method' },
+            { id: 3, questionText: 'Which data type is used to create a variable that should store text?', options: ['myString', 'String', 'Txt', 'string'], correctAnswer: 'String' },
+            { id: 4, questionText: 'Which keyword is used to inherit a class in Java?', options: ['implements', 'extends', 'inherits', 'uses'], correctAnswer: 'extends' },
+            { id: 5, questionText: 'What is the default value of a boolean variable in Java?', options: ['true', 'false', '0', 'null'], correctAnswer: 'false' },
+            { id: 6, questionText: 'Which package contains the Random class?', options: ['java.util', 'java.lang', 'java.io', 'java.net'], correctAnswer: 'java.util' },
+            { id: 7, questionText: 'What is the size of a `char` variable in Java?', options: ['8 bits', '16 bits', '32 bits', '64 bits'], correctAnswer: '16 bits' },
+            { id: 8, questionText: 'Which of these is used for input and output operations in Java?', options: ['java.io', 'java.util', 'java.lang', 'java.awt'], correctAnswer: 'java.io' },
+            { id: 9, questionText: 'Which access modifier means the member is accessible only within the class itself?', options: ['public', 'protected', 'private', 'default'], correctAnswer: 'private' },
+            { id: 10, questionText: 'What is the purpose of the `finally` block in a try-catch-finally statement?', options: ['To execute code if an exception occurs', 'To execute code regardless of whether an exception occurs', 'To catch specific exceptions', 'To define a new exception'], correctAnswer: 'To execute code regardless of whether an exception occurs' },
+            
+            // --- Aptitude Questions (5) ---
+            { id: 11, questionText: 'If 3, 5, 8, 12, 17... what is the next number in the sequence?', options: ['21', '23', '24', '25'], correctAnswer: '23' },
+            { id: 12, questionText: 'The ratio of two numbers is 3:8 and their difference is 115. The smaller number is:', options: ['69', '46', '23', '92'], correctAnswer: '69' },
+            { id: 13, questionText: 'Pointing to a girl, Raj said, "She is the only daughter of my grandfather\'s son." How is the girl related to Raj?', options: ['Sister', 'Mother', 'Cousin', 'Wife'], correctAnswer: 'Sister' },
+            { id: 14, questionText: 'What is the volume of a cube whose surface area is 600 cm²?', options: ['100 cm³', '1000 cm³', '600 cm³', '300 cm³'], correctAnswer: '1000 cm³' },
+            { id: 15, questionText: 'If `B` is $15$ years younger than `A` and $5$ years older than `C`, and `C` is $20$ years old, what is the age of `A`?', options: ['40', '50', '60', '70'], correctAnswer: '40' },
+        ];
+
+        let currentQuestionIndex = 0;
+        let selectedAnswers = {};
+        let markedForReview = {};
+        let score = 0;
+        let timeLeft = 600;
+        let examState = 'idle';
+        let showConfirmationModal = false;
+        let modalType = '';
+        let loading = false;
+        let isWebcamActive = false;
+        let webcamStream = null;
+        let isMicActive = false;
+        let micStream = null;
+        let timerInterval;
+
+        // --- Proctoring State ---
+        let proctoringAttempts = 0;
+        const maxAttempts = 3;
+        let proctoringInterval;
+        let isProctoringPaused = false;
+        
+        // Detailed Violation Messages
+        const VIOLATION_MESSAGES = [
+            "Multiple Faces Detected: An unauthorized person has entered the camera view.",
+            "Candidate Look-Away: Candidate's gaze shifted away from the screen for an extended period.",
+            "Low Lighting Detected: Insufficient room lighting prevents clear video analysis. Please adjust your lighting.",
+            "Browser Focus Loss: The exam window was minimized or switched, violating exam integrity rules.",
+            "Suspicious Mobile Device Detected: Unauthorized screen or peripheral usage noticed."
+        ];
+
+        // Violations available for random check (Browser Focus Loss removed)
+        const RANDOM_VIOLATIONS = [
+            "Candidate Look-Away: Candidate's gaze shifted away from the screen for an extended period.",
+            "Low Lighting Detected: Insufficient room lighting prevents clear video analysis. Please adjust your lighting."
+        ];
+        // ------------------------
+
+        const elements = {
+            loadingScreen: document.getElementById('loadingScreen'),
+            idleScreen: document.getElementById('idleScreen'),
+            examScreen: document.getElementById('examScreen'),
+            resultsScreen: document.getElementById('resultsScreen'),
+            navigationPanel: document.getElementById('navigationPanel'),
+            totalQuestionsCount: document.getElementById('totalQuestionsCount'),
+            initialTime: document.getElementById('initialTime'),
+            startButton: document.getElementById('startButton'),
+            webcamVideo: document.getElementById('webcamVideo'),
+            toggleWebcamMicButton: document.getElementById('toggleWebcamMicButton'),
+            toggleStatusMessage: document.getElementById('toggleStatusMessage'),
+            progressBar: document.getElementById('progressBar'),
+            timeLeftDisplay: document.getElementById('timeLeftDisplay'),
+            answeredQuestionsCount: document.getElementById('answeredQuestionsCount'),
+            totalQuestionsDisplay: document.getElementById('totalQuestionsDisplay'),
+            submitExamButtonTop: document.getElementById('submitExamButtonTop'),
+            micStatusExam: document.getElementById('micStatusExam'),
+            questionContainer: document.getElementById('questionContainer'),
+            questionNumber: document.getElementById('questionNumber'),
+            markReviewButton: document.getElementById('markReviewButton'),
+            questionText: document.getElementById('questionText'),
+            optionsContainer: document.getElementById('optionsContainer'),
+            prevButton: document.getElementById('prevButton'),
+            nextButton: document.getElementById('nextButton'),
+            finalScore: document.getElementById('finalScore'),
+            totalQuestionsResults: document.getElementById('totalQuestionsResults'),
+            correctAnswersCount: document.getElementById('correctAnswersCount'),
+            startNewExamButton: document.getElementById('startNewExamButton'),
+            reviewAnswersContainer: document.getElementById('reviewAnswersContainer'),
+            questionNavGrid: document.getElementById('questionNavGrid'),
+            confirmationModal: document.getElementById('confirmationModal'),
+            modalContent: document.getElementById('modalContent'),
+            modalTitle: document.getElementById('modalTitle'),
+            modalMessage: document.getElementById('modalMessage'),
+            modalCancelButton: document.getElementById('modalCancelButton'),
+            modalConfirmButton: document.getElementById('modalConfirmButton'),
+            modalButtons: document.getElementById('modalButtons'),
+            // --- New Proctoring Elements ---
+            proctoringWarning: document.getElementById('proctoringWarning'),
+            warningTitle: document.getElementById('warningTitle'),
+            warningMessage: document.getElementById('warningMessage'),
+            attemptsRemaining: document.getElementById('attemptsRemaining'),
+            resultsTitle: document.getElementById('resultsTitle'),
+            examCancelledDetails: document.getElementById('examCancelledDetails'),
+            examNormalDetails: document.getElementById('examNormalDetails'),
+            reviewSection: document.getElementById('reviewSection'),
+            examContentScroll: document.getElementById('examContentScroll'),
+            proctoringPanel: document.getElementById('webcamStatusPanel') // Mapped to new top-left panel
+            // -------------------------------
+        };
+
+        function formatTime(s) {
+            const min = Math.floor(s / 60);
+            const sec = s % 60;
+            return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        function updateStartButtonState() {
+            if (isWebcamActive && isMicActive) {
+                elements.startButton.disabled = false;
+                elements.startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                elements.startButton.classList.add('hover:bg-blue-700');
+            } else {
+                elements.startButton.disabled = true;
+                elements.startButton.classList.add('opacity-50', 'cursor-not-allowed');
+                elements.startButton.classList.remove('hover:bg-blue-700');
+            }
+        }
+        
+        // New central function for stream cleanup
+        function stopStreamsAndResetUI() {
+            stopProctoringLoop();
+            
+            // Stop Webcam Stream
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            isWebcamActive = false;
+            elements.webcamVideo.classList.add('hidden');
+
+            // Stop Microphone Stream
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
+            isMicActive = false;
+            elements.micStatusExam.classList.add('hidden');
+
+            // Reset Toggle Button
+            elements.toggleWebcamMicButton.classList.remove('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-500');
+            elements.toggleWebcamMicButton.classList.add('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-500');
+            elements.toggleWebcamMicButton.textContent = 'Enable Webcam & Mic';
+            elements.toggleStatusMessage.classList.add('hidden');
+
+            elements.proctoringPanel.classList.add('hidden'); // Hide proctoring panel
+            updateStartButtonState(); // Update start button state on the idle screen
+        }
+
+        async function toggleWebcamMic() {
+            if (isWebcamActive && isMicActive) {
+                // If active, disable/stop everything
+                stopStreamsAndResetUI();
+                return;
+            }
+
+            // Attempt to enable both streams
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                
+                // Video setup
+                elements.webcamVideo.srcObject = stream;
+                elements.webcamVideo.classList.remove('hidden');
+                webcamStream = stream;
+                isWebcamActive = true;
+                
+                // Audio setup
+                micStream = stream;
+                isMicActive = true;
+                
+                // SUCCESS FEEDBACK
+                elements.toggleStatusMessage.classList.remove('hidden', 'text-red-600');
+                elements.toggleStatusMessage.classList.add('text-green-600', 'font-semibold');
+                elements.toggleStatusMessage.innerHTML = 'Media: <span class="font-bold">Active</span>';
+                elements.micStatusExam.classList.remove('hidden');
+
+                elements.toggleWebcamMicButton.classList.remove('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-500');
+                elements.toggleWebcamMicButton.classList.add('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-500');
+                elements.toggleWebcamMicButton.textContent = 'Disable Media';
+            } catch (err) {
+                console.error("Error accessing media: ", err);
+                // Clean up in case only one succeeded (though it usually fails all or nothing)
+                stopStreamsAndResetUI(); 
+
+                // ERROR FEEDBACK
+                elements.toggleStatusMessage.classList.remove('hidden', 'text-green-600');
+                elements.toggleStatusMessage.classList.add('text-red-600', 'font-semibold');
+                elements.toggleStatusMessage.innerHTML = 'Media access **DENIED**. Check permissions!';
+                
+                elements.toggleWebcamMicButton.textContent = 'Enable Webcam & Mic'; // Reset text on failure
+            }
+            updateStartButtonState();
+            updateProctoringDisplay();
+        }
+
+        function updateProctoringDisplay() {
+            if (examState === 'started' && (isWebcamActive || isMicActive)) {
+                elements.proctoringPanel.classList.remove('hidden');
+                elements.proctoringPanel.classList.add('flex');
+            } else {
+                elements.proctoringPanel.classList.add('hidden');
+                elements.proctoringPanel.classList.remove('flex');
+            }
+        }
+
+        // --- Proctoring Logic ---
+
+        // Helper function to randomly select a violation reason
+        function getRandomViolationReason(isManual = false) {
+             
+             if (isManual) {
+                // Manually triggered button cycles between Multi-Face and Mobile Device
+                const manualViolations = [
+                    "Multiple Faces Detected: An unauthorized person has entered the camera view.",
+                    "Suspicious Mobile Device Detected: Unauthorized screen or peripheral usage noticed."
+                ];
+                const randomIndex = Math.floor(Math.random() * manualViolations.length);
+                return manualViolations[randomIndex];
+            }
+
+            // Random check cycles through the GENERAL/ENVIRONMENTAL violations
+            const randomIndex = Math.floor(Math.random() * RANDOM_VIOLATIONS.length);
+            return RANDOM_VIOLATIONS[randomIndex];
+        }
+
+        function handleViolation(reason) {
+            if (examState !== 'started' || isProctoringPaused) return;
+
+            // Pause the regular exam timer
+            isProctoringPaused = true;
+            clearInterval(timerInterval); 
+
+            proctoringAttempts++;
+
+            // --- Show Violation Popup ---
+            elements.modalType = 'proctoring';
+            elements.modalTitle.textContent = "SECURITY WARNING!";
+            elements.modalTitle.classList.add('text-red-600');
+            elements.modalMessage.innerHTML = `<p class="font-semibold text-lg text-red-700 mb-2">Violation Detected:</p><p class="text-gray-800 mb-4">${reason}</p><p class="text-sm font-semibold">Remaining Attempts: ${maxAttempts - proctoringAttempts}</p>`;
+            
+            // Hide normal modal buttons and show only the acknowledgment button
+            elements.modalButtons.innerHTML = `<button id="proctoringAcknowledgeButton" class="px-6 py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
+                Acknowledge & Continue
+            </button>`;
+            
+            // Re-attach the acknowledge function to the new button
+            document.getElementById('proctoringAcknowledgeButton').onclick = acknowledgeViolation;
+
+            showConfirmationModal = true;
+            elements.confirmationModal.classList.remove('hidden');
+            // ---------------------------
+
+            if (proctoringAttempts >= maxAttempts) {
+                submitExam(true); // Cancel the exam immediately
+                return;
+            }
+
+            // Also show the persistent warning bar (optional, but good for status)
+            elements.warningTitle.textContent = "Violation Recorded.";
+            elements.warningMessage.textContent = `Reason: ${reason}.`;
+            elements.attemptsRemaining.textContent = maxAttempts - proctoringAttempts;
+            elements.proctoringWarning.classList.remove('hidden');
+            
+            // Auto-hide the persistent bar after 5 seconds
+            setTimeout(() => {
+                elements.proctoringWarning.classList.add('hidden');
+            }, 5000);
+        }
+
+        function acknowledgeViolation() {
+            if (examState !== 'started') return;
+
+            // Hide the modal
+            showConfirmationModal = false;
+            elements.confirmationModal.classList.add('hidden');
+            
+            // Restore original modal buttons (for submission/timeout)
+            elements.modalButtons.innerHTML = '';
+            elements.modalButtons.appendChild(elements.modalCancelButton);
+            elements.modalButtons.appendChild(elements.modalConfirmButton);
+            elements.modalTitle.classList.remove('text-red-600');
+
+            // Resume the exam timer and proctoring
+            isProctoringPaused = false;
+            startTimer(); 
+        }
+
+        function startProctoringLoop() {
+            // Ensure any previous loop is cleared for clean restart
+            stopProctoringLoop(); 
+            
+            // Set the interval to check for violations every 2 seconds
+            proctoringInterval = setInterval(() => {
+                // Only proceed if the exam is running and NOT paused by a warning modal
+                if (examState === 'started' && !isProctoringPaused) {
+                    const violationChance = 0.125; 
+
+                    if (Math.random() < violationChance) { 
+                        // Trigger a random visual/environment violation
+                        const reason = getRandomViolationReason(false); 
+                        handleViolation(reason);
+                    }
+                }
+            }, 2000); 
+        }
+
+        function stopProctoringLoop() {
+            clearInterval(proctoringInterval);
+        }
+        
+        // FIX: New window blur/focus event listener for accurate detection
+        function setupFocusProctoring() {
+            window.addEventListener('blur', () => {
+                if (examState === 'started' && !isProctoringPaused) {
+                    // Find the specific violation message from the global array
+                    const reason = VIOLATION_MESSAGES.find(msg => msg.includes("Browser Focus Loss"));
+                    handleViolation(reason);
+                }
+            });
+        }
+
+        // --- End Proctoring Logic ---
+
+
+        function renderQuestion() {
+            const question = questions[currentQuestionIndex];
+            elements.questionNumber.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+            elements.questionText.textContent = question.questionText;
+            elements.optionsContainer.innerHTML = '';
+
+            question.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                // Use smaller padding defined in <style> block
+                button.classList.add('w-full', 'text-left', 'rounded-lg', 'border-2', 'transition-all', 'duration-200', 'transform', 'hover:scale-[1.01]', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-500', 'focus:ring-opacity-50');
+                
+                if (selectedAnswers[question.id] === option) {
+                    button.classList.add('bg-blue-600', 'text-white', 'border-blue-700', 'shadow-md');
+                } else {
+                    button.classList.add('bg-gray-50', 'text-gray-800', 'border-gray-200', 'hover:bg-blue-50', 'hover:border-blue-300');
+                }
+
+                button.onclick = () => handleOptionSelect(question.id, option);
+                elements.optionsContainer.appendChild(button);
+            });
+
+            elements.markReviewButton.classList.remove('bg-yellow-500', 'text-white', 'hover:bg-yellow-600', 'bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            if (markedForReview[question.id]) {
+                elements.markReviewButton.classList.add('bg-yellow-500', 'text-white', 'hover:bg-yellow-600');
+                elements.markReviewButton.textContent = 'Unmark for Review';
+            } else {
+                elements.markReviewButton.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                elements.markReviewButton.textContent = 'Mark for Review';
+            }
+
+            elements.prevButton.disabled = currentQuestionIndex === 0;
+            if (currentQuestionIndex === 0) {
+                elements.prevButton.classList.add('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                elements.prevButton.classList.remove('bg-blue-500', 'text-white', 'hover:bg-blue-600', 'hover:shadow-lg');
+            } else {
+                elements.prevButton.classList.remove('bg-gray-300', 'text-gray-600', 'cursor-not-allowed');
+                elements.prevButton.classList.add('bg-blue-500', 'text-white', 'hover:bg-blue-600', 'hover:shadow-lg');
+            }
+
+            if (currentQuestionIndex < questions.length - 1) {
+                elements.nextButton.textContent = 'Next';
+                elements.nextButton.classList.remove('bg-green-600', 'hover:bg-green-700', 'focus:ring-green-600');
+                elements.nextButton.classList.add('bg-blue-500', 'hover:bg-blue-600', 'focus:ring-blue-500');
+            } else {
+                elements.nextButton.textContent = 'Finish Exam';
+                elements.nextButton.classList.remove('bg-blue-500', 'hover:bg-blue-600', 'focus:ring-blue-500');
+                elements.nextButton.classList.add('bg-green-600', 'hover:bg-green-700', 'focus:ring-green-600');
+            }
+            updateNavigationPanel();
+            updateProgressBar();
+            updateProgressDisplay();
+        }
+
+        function handleOptionSelect(questionId, option) {
+            selectedAnswers[questionId] = option;
+            renderQuestion();
+        }
+
+        function toggleMarkForReview() {
+            const question = questions[currentQuestionIndex];
+            markedForReview[question.id] = !markedForReview[question.id];
+            renderQuestion();
+        }
+
+        function jumpToQuestion(index) {
+            currentQuestionIndex = index;
+            renderQuestion();
+        }
+
+        function handleNextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            } else {
+                confirmSubmit();
+            }
+        }
+
+        function handlePreviousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+            }
+        }
+
+        function updateNavigationPanel() {
+            elements.questionNavGrid.innerHTML = '';
+            questions.forEach((q, index) => {
+                const button = document.createElement('button');
+                button.textContent = index + 1;
+                button.classList.add('p-2', 'rounded-md', 'text-sm', 'font-medium', 'border-2', 'transition-all', 'duration-150');
+
+                const isAnswered = selectedAnswers[q.id] !== undefined;
+                const isCurrent = currentQuestionIndex === index;
+                const isMarked = markedForReview[q.id];
+
+                if (isCurrent) {
+                    button.classList.add('bg-blue-600', 'text-white', 'border-blue-700', 'shadow-md');
+                } else if (isMarked) {
+                    button.classList.add('bg-yellow-200', 'text-yellow-800', 'border-yellow-300', 'hover:bg-yellow-300');
+                } else if (isAnswered) {
+                    button.classList.add('bg-green-200', 'text-green-800', 'border-green-300', 'hover:bg-green-300');
+                } else {
+                    button.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-200', 'hover:bg-gray-200');
+                }
+                button.onclick = () => jumpToQuestion(index);
+                elements.questionNavGrid.appendChild(button);
+            });
+        }
+
+        function updateProgressBar() {
+            const answeredCount = Object.keys(selectedAnswers).length;
+            const progress = (answeredCount / questions.length) * 100;
+            elements.progressBar.style.width = `${progress}%`;
+        }
+
+        function updateProgressDisplay() {
+            const answeredCount = Object.keys(selectedAnswers).length;
+            elements.answeredQuestionsCount.textContent = answeredCount;
+            elements.totalQuestionsDisplay.textContent = questions.length;
+        }
+
+        function startExam() {
+            if (!isWebcamActive || !isMicActive) {
+                // Flash an alert if media isn't enabled
+                alert("Please enable your Webcam and Microphone using the 'Enable Webcam & Mic' button before starting the exam.");
+                return;
+            }
+
+            loading = true;
+            elements.idleScreen.classList.add('hidden');
+            elements.loadingScreen.classList.remove('hidden');
+
+            setTimeout(() => {
+                loading = false;
+                examState = 'started';
+                timeLeft = 600;
+                currentQuestionIndex = 0;
+                selectedAnswers = {};
+                markedForReview = {};
+                score = 0;
+                proctoringAttempts = 0; // Reset attempts
+                showConfirmationModal = false;
+                isProctoringPaused = false; // Ensure not paused on start
+
+                elements.loadingScreen.classList.add('hidden');
+                elements.examScreen.classList.remove('hidden');
+                elements.navigationPanel.classList.remove('hidden');
+                elements.resultsScreen.classList.add('hidden');
+                
+                renderQuestion();
+                startTimer();
+                startProctoringLoop(); // Start the proctoring checks
+                setupFocusProctoring(); // Activate the focus listener here
+                updateProctoringDisplay(); // Show the consolidated panel
+            }, 500);
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0 && examState === 'started' && !isProctoringPaused) {
+                    timeLeft--;
+                    elements.timeLeftDisplay.textContent = formatTime(timeLeft);
+                } else if (timeLeft === 0 && examState === 'started') {
+                    clearInterval(timerInterval);
+                    modalType = 'timeout';
+                    showConfirmationModal = true;
+                    elements.confirmationModal.classList.remove('hidden');
+                    elements.modalTitle.textContent = 'Time Expired!';
+                    elements.modalMessage.innerHTML = 'Your time has run out. The exam will be submitted automatically.';
+                    elements.modalCancelButton.textContent = 'Submit Automatically'; 
+                    elements.modalButtons.classList.remove('hidden'); 
+                    elements.modalConfirmButton.classList.remove('hidden');
+                }
+            }, 1000);
+        }
+
+        function confirmSubmit() {
+            modalType = 'summary';
+            showConfirmationModal = true;
+            elements.confirmationModal.classList.remove('hidden');
+            elements.modalTitle.textContent = 'Exam Summary & Submission';
+            const answeredCount = Object.keys(selectedAnswers).length;
+            const markedCount = Object.keys(markedForReview).filter(id => markedForReview[id]).length;
+            elements.modalMessage.innerHTML = `You have answered **${answeredCount}** out of **${questions.length}** questions. <br />**${markedCount}** questions are marked for review. <br />Are you sure you want to submit?`;
+            elements.modalCancelButton.textContent = 'Go Back';
+            elements.modalConfirmButton.textContent = 'Submit Exam';
+            elements.modalButtons.classList.remove('hidden'); // Ensure buttons visible for submission
+        }
+
+        function submitExam(isCancelled = false) {
+            clearInterval(timerInterval);
+            stopStreamsAndResetUI(); // Centralized cleanup
+            
+            elements.examScreen.classList.add('hidden');
+            elements.navigationPanel.classList.add('hidden');
+            elements.loadingScreen.classList.remove('hidden');
+            elements.proctoringPanel.classList.add('hidden'); // Ensure hidden on results screen
+            showConfirmationModal = false;
+            elements.confirmationModal.classList.add('hidden');
+
+            setTimeout(() => {
+                loading = false;
+                examState = 'submitted';
+                elements.loadingScreen.classList.add('hidden');
+                elements.resultsScreen.classList.remove('hidden');
+                
+                if (isCancelled) {
+                    elements.resultsTitle.textContent = "Exam Invalidation";
+                    elements.examCancelledDetails.classList.remove('hidden');
+                    elements.examNormalDetails.classList.add('hidden');
+                    elements.reviewSection.classList.add('hidden');
+                } else {
+                    let calculatedScore = 0;
+                    questions.forEach(question => {
+                        if (selectedAnswers[question.id] === question.correctAnswer) {
+                            calculatedScore++;
+                        }
+                    });
+                    score = calculatedScore;
+                    elements.resultsTitle.textContent = "Exam Completed!";
+                    elements.examCancelledDetails.classList.add('hidden');
+                    elements.examNormalDetails.classList.remove('hidden');
+                    elements.reviewSection.classList.remove('hidden');
+
+                    elements.finalScore.textContent = score;
+                    elements.totalQuestionsResults.textContent = questions.length;
+                    elements.correctAnswersCount.textContent = score;
+                    renderResultsReview();
+                }
+
+            }, 500);
+        }
+
+        function renderResultsReview() {
+            elements.reviewAnswersContainer.innerHTML = '';
+            questions.forEach((q, index) => {
+                const userAnswer = selectedAnswers[q.id];
+                const isCorrect = userAnswer === q.correctAnswer;
+                const isAnswered = userAnswer !== undefined;
+
+                const div = document.createElement('div');
+                div.classList.add('mb-6', 'p-4', 'rounded-lg', 'border', 'border-gray-200');
+
+                const qNumText = document.createElement('p');
+                qNumText.classList.add('font-medium', 'text-gray-900', 'mb-2');
+                qNumText.textContent = `${index + 1}. ${q.questionText}`;
+                div.appendChild(qNumText);
+
+                const yourAnswerText = document.createElement('p');
+                yourAnswerText.classList.add('text-gray-700');
+                yourAnswerText.innerHTML = `Your Answer: <span class="${isAnswered ? (isCorrect ? 'text-green-600' : 'text-red-600') : 'text-gray-500'} font-semibold">${isAnswered ? userAnswer : 'Not Answered'}</span>`;
+                div.appendChild(yourAnswerText);
+
+                if (!isCorrect) {
+                    const correctAnswerText = document.createElement('p');
+                    correctAnswerText.classList.add('text-green-600', 'font-semibold');
+                    correctAnswerText.textContent = `Correct Answer: ${q.correctAnswer}`;
+                    div.appendChild(correctAnswerText);
+                }
+                elements.reviewAnswersContainer.appendChild(div);
+            });
+        }
+
+        // Event Listeners
+        elements.startButton.addEventListener('click', startExam);
+        elements.toggleWebcamMicButton.addEventListener('click', toggleWebcamMic); // CONSOLIDATED BUTTON
+        elements.submitExamButtonTop.addEventListener('click', confirmSubmit);
+        elements.markReviewButton.addEventListener('click', toggleMarkForReview);
+        elements.prevButton.addEventListener('click', handlePreviousQuestion);
+        elements.nextButton.addEventListener('click', handleNextQuestion);
+        elements.startNewExamButton.addEventListener('click', startExam);
+        
+        // --- Modal Logic ---
+        elements.modalCancelButton.addEventListener('click', () => {
+            if (modalType === 'timeout') {
+                submitExam(false);
+            } else {
+                showConfirmationModal = false;
+                elements.confirmationModal.classList.add('hidden');
+            }
+        });
+
+        elements.modalConfirmButton.addEventListener('click', () => {
+            if (modalType === 'summary' || modalType === 'timeout') {
+                submitExam(false);
+            }
+        });
+        
+        // --- Proctoring Event Listener (Multiple Faces/Mobile Device Simulation) ---
+        // Attaching the violation simulation to the navigation panel title area
+        const simulateViolationElement = document.getElementById('navigationPanel'); // Using the whole navigation panel for a hidden button
+        simulateViolationElement.addEventListener('click', (e) => {
+             // Only fire if the exam is started and the click is on the panel itself (not inside a question number button)
+             if (examState === 'started' && e.target === simulateViolationElement) {
+                // Manually trigger a random choice between the two high-priority violations
+                handleViolation(getRandomViolationReason(true));
+             }
+        });
+
+
+        // Initial setup
+        elements.totalQuestionsCount.textContent = questions.length;
+        elements.totalQuestionsDisplay.textContent = questions.length;
+        elements.initialTime.textContent = formatTime(timeLeft);
+        elements.timeLeftDisplay.textContent = formatTime(timeLeft);
+        elements.attemptsRemaining.textContent = maxAttempts;
+        updateStartButtonState();
+        setupFocusProctoring(); // Set up the listener on initialization
+    </script>
+</body>
+</html>
