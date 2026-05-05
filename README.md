@@ -17,6 +17,6 @@ HTML <br>
 CSS <br>
 JavaScript <br>
 Backend: <br>
-Java (Spring Boot) / Node.js (depending on your version) <br>
+Java <br>
 Database: <br>
 MySQL / MongoDB <br>
